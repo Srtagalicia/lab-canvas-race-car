@@ -5,7 +5,8 @@ window.onload = () => {
   const context = canvas.getContext('2d');
   const board = new Board(canvas);
   const car = new Car(canvas);
-  const game = new Game(board, car);
+  const obstacleManager = new ObstacleManager(canvas);
+  const game = new Game(canvas, board, car, obstacleManager);
 
   document.getElementById('start-button').onclick = () => {
     game.startGame();
@@ -14,15 +15,30 @@ window.onload = () => {
 };
 
 class Game{
-  constructor(board, car){ 
+  constructor(canvas, board, car, obstacleManager){ 
+    this.canvas = canvas;
+    this.context = canvas.getContext('2d');
     this.board = board;
     this.car = car;
+    this.obstacleManager = obstacleManager;
+    this.score = 0;
+    this.intervalId;
   }
   startGame(){
+    let counter = 0;
     this.bindKeys();
-    setInterval(() => {
+    this.intervalId = setInterval(() => {
       this.board.draw();
       this.car.draw();
+      this.obstacleManager.drawObstacles();
+      this.obstacleManager.moveObstacles();
+      this.drawScore();
+      this.checkCollision();
+      counter++;
+      if (counter === 100){
+        this.score++;
+        counter = 0;
+      }
     }, 33);
   }
   bindKeys(){
@@ -34,6 +50,30 @@ class Game{
         this.car.moveLeft();
       }
     });
+  }
+  drawScore(){
+    this.context.fillStyle = "red";
+    this.context.font = "20px Roboto"
+    this.context.fillText(`score: ${this.score}`, 25, 25);
+  }
+  checkCollision(){
+    this.obstacleManager.obstacles.forEach((obstacle) => {
+      let leftCollision = this.car.posX > obstacle.posX && this.car.posX < obstacle.posX + obstacle.width;
+      let rightCollision = this.car.posX + this.car.width > obstacle.posX && this.car.posX + this.car.width <  obstacle.posX + obstacle.width;
+      let frontCollision = this.car.posY === obstacle.posY + obstacle.height;
+      if (leftCollision && frontCollision || rightCollision && frontCollision){
+        this.gameOver();
+      }
+    });
+  }
+
+  gameOver(){
+    this.context.fillStyle = "black";
+    this.context.fillRect(0, 0, canvas.width, canvas.height);
+    this.context.fillStyle = "white";
+    this.context.font = "20px Roboto"
+    this.context.fillText(`Game over. Your final score is: ${this.score}`, 50, 50);
+    clearInterval(this.intervalId);
   }
 }
 
@@ -67,12 +107,57 @@ class Car{
   }
   moveLeft(){
     if (this.posX > 10){
-      this.posX--  
+      this.posX--; 
     }
   }
   moveRight(){
     if (this.posX < this.canvas.width-this.width-10){
-      this.posX++
+      this.posX++;
     }
   }
 }
+
+class Obstacle{
+  constructor(canvas, posX, posY, width){
+    this.canvas = canvas;
+    this.context = canvas.getContext('2d');
+    this.posX = posX;
+    this.width = width;
+    this.height = 20;
+    this.posY = posY;
+  }
+  draw(){
+    this.context.fillStyle = "black";
+    this.context.fillRect(this.posX, this.posY, this.width, this.height);
+  }
+  advance(){
+    this.posY++;
+  }
+}
+
+class ObstacleManager{
+  constructor(canvas){
+    this.canvas = canvas;
+    this.context = canvas.getContext('2d');
+    this.obstacles = [];
+    this.initObstacles();
+  }
+  initObstacles(){
+    for(let i = 1; i <= 4; i++){
+      let obstacle = new Obstacle(canvas, Math.floor(Math.random()*(this.canvas.width-90)), -250*i, 90);
+      this.obstacles.push(obstacle);
+    }
+  }
+  drawObstacles(){
+    this.obstacles.forEach((obstacle) => {obstacle.draw()});
+  }
+  moveObstacles(){
+    this.obstacles.forEach((obstacle) => {
+      obstacle.advance()
+      if (obstacle.posY > canvas.height){
+        obstacle.posY = -obstacle.height;
+      }
+    });
+  } 
+}
+
